@@ -1,0 +1,35 @@
+# API 인증 정보 (절대 커밋 금지)
+docs/api-credentials.md
+.env
+.env.local
+.env.*.local
+
+# 민감한 설정 파일
+config/credentials.json
+config/secrets.json
+*.key
+*.pem
+
+# OS 관련
+.DS_Store
+Thumbs.db
+
+# IDE 관련
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 빌드 산출물
+dist/
+build/
+*.log
+
+# 노드 모듈 (추후 개발 시)
+node_modules/
+
+# Python 관련 (추후 개발 시)
+__pycache__/
+*.py[cod]
+venv/
