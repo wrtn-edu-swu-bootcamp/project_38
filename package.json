@@ -1,0 +1,56 @@
+{
+  "name": "factchecker",
+  "version": "0.1.0",
+  "description": "가짜뉴스와 허위정보를 학술자료 기반으로 검증하고, 도서관 이용을 활성화하는 팩트체크 서비스",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit",
+    "prisma:generate": "prisma generate",
+    "prisma:push": "prisma db push",
+    "prisma:studio": "prisma studio",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "@auth/prisma-adapter": "^2.7.4",
+    "@prisma/client": "^6.2.0",
+    "@tanstack/react-query": "^5.62.8",
+    "@trpc/client": "^11.0.0",
+    "@trpc/next": "^11.0.0",
+    "@trpc/react-query": "^11.0.0",
+    "@trpc/server": "^11.0.0",
+    "bcryptjs": "^2.4.3",
+    "next": "16.1.4",
+    "next-auth": "^5.0.0-beta.25",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "superjson": "^2.2.2",
+    "tesseract.js": "^5.1.1",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^22.10.5",
+    "@types/react": "^19.0.6",
+    "@types/react-dom": "^19.0.2",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^9.18.0",
+    "eslint-config-next": "16.1.4",
+    "postcss": "^8.4.49",
+    "prettier": "^3.4.2",
+    "prettier-plugin-tailwindcss": "^0.6.9",
+    "prisma": "^6.2.0",
+    "tailwindcss": "^4.1.18",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  }
+}

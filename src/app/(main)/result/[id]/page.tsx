@@ -1,0 +1,301 @@
+"use client";
+
+import { useEffect } from "react";
+import { useParams } from "next/navigation";
+import Link from "next/link";
+import { api } from "@/lib/trpc";
+import { Button } from "@/components/ui/Button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/Tabs";
+
+export default function ResultPage() {
+  const params = useParams();
+  const id = params?.id as string;
+
+  // Poll for status updates every 2 seconds when processing
+  const { data: factCheck } = api.factCheck.getById.useQuery(
+    { id },
+    {
+      enabled: !!id,
+      refetchInterval: (query) => {
+        const data = query.state.data;
+        if (!data) return false;
+        return data.status === "PROCESSING" ? 2000 : false;
+      },
+    }
+  );
+
+  if (!factCheck) {
+    return (
+      <div className="container mx-auto px-4 py-12">
+        <div className="mx-auto max-w-4xl text-center">
+          <p className="text-gray-600">로딩 중...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (factCheck.status === "PENDING" || factCheck.status === "PROCESSING") {
+    return <ProcessingView />;
+  }
+
+  if (factCheck.status === "FAILED") {
+    return <FailedView />;
+  }
+
+  return <CompletedView factCheck={factCheck} />;
+}
+
+function ProcessingView() {
+  return (
+    <div className="container mx-auto px-4 py-12">
+      <div className="mx-auto max-w-3xl">
+        <Card>
+          <CardContent className="py-12 text-center">
+            <div className="mb-6 inline-block">
+              <svg
+                className="h-16 w-16 animate-spin text-primary-600"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
+              </svg>
+            </div>
+            <h2 className="mb-4 text-2xl font-bold text-gray-900">
+              정보를 분석하고 있습니다
+            </h2>
+            <p className="mb-8 text-gray-600">
+              학술자료를 검색하고 AI가 신뢰도를 평가하고 있습니다.
+              <br />
+              잠시만 기다려주세요...
+            </p>
+            <div className="space-y-3">
+              <div className="flex items-center justify-center gap-3">
+                <div className="h-2 w-2 rounded-full bg-primary-600 animate-pulse" />
+                <p className="text-sm text-gray-500">학술정보 검색 중</p>
+              </div>
+              <div className="flex items-center justify-center gap-3">
+                <div className="h-2 w-2 rounded-full bg-primary-600 animate-pulse delay-75" />
+                <p className="text-sm text-gray-500">도서관 정보 조회 중</p>
+              </div>
+              <div className="flex items-center justify-center gap-3">
+                <div className="h-2 w-2 rounded-full bg-primary-600 animate-pulse delay-150" />
+                <p className="text-sm text-gray-500">AI 분석 진행 중</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function FailedView() {
+  return (
+    <div className="container mx-auto px-4 py-12">
+      <div className="mx-auto max-w-3xl">
+        <Card>
+          <CardContent className="py-12 text-center">
+            <div className="mb-6 inline-block">
+              <svg
+                className="h-16 w-16 text-danger"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            </div>
+            <h2 className="mb-4 text-2xl font-bold text-gray-900">
+              분석 중 오류가 발생했습니다
+            </h2>
+            <p className="mb-8 text-gray-600">
+              일시적인 문제가 발생했습니다. 다시 시도해주세요.
+            </p>
+            <Link href="/verify">
+              <Button variant="primary">다시 시도하기</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function CompletedView({ factCheck }: { factCheck: any }) {
+  const verdictConfig: Record<
+    string,
+    { label: string; variant: "success" | "info" | "warning" | "danger" | "neutral" }
+  > = {
+    CONFIRMED: { label: "사실로 확인됨", variant: "success" as const },
+    MOSTLY_TRUE: { label: "대체로 사실", variant: "info" as const },
+    CAUTION: { label: "주의 필요", variant: "warning" as const },
+    FALSE: { label: "거짓", variant: "danger" as const },
+    UNVERIFIABLE: { label: "검증 불가", variant: "neutral" as const },
+  };
+
+  const verdict = factCheck.verdict
+    ? verdictConfig[factCheck.verdict] || verdictConfig.UNVERIFIABLE
+    : verdictConfig.UNVERIFIABLE;
+
+  // Group references by type
+  const papers = factCheck.references.filter((ref: any) =>
+    ["ACADEMIC_PAPER", "JOURNAL", "THESIS"].includes(ref.type)
+  );
+  const books = factCheck.references.filter((ref: any) => ref.type === "BOOK");
+  const news = factCheck.references.filter((ref: any) => ref.type === "NEWS");
+
+  return (
+    <div className="container mx-auto px-4 py-12">
+      <div className="mx-auto max-w-4xl space-y-8">
+        {/* Trust Score Card */}
+        <Card>
+          <CardContent className="py-8">
+            <div className="text-center">
+              <Badge variant={verdict.variant} className="mb-4 text-lg px-6 py-2">
+                {verdict.label}
+              </Badge>
+              <div className="mb-4">
+                <div className="text-6xl font-bold text-gray-900">
+                  {factCheck.trustScore?.toFixed(0) || "N/A"}
+                  <span className="text-2xl text-gray-500">/100</span>
+                </div>
+                <p className="text-sm text-gray-600">신뢰도 점수</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Summary Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle>검증 요약</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-gray-700 leading-relaxed">{factCheck.summary}</p>
+          </CardContent>
+        </Card>
+
+        {/* Detailed Explanation */}
+        <Card>
+          <CardHeader>
+            <CardTitle>상세 분석</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-gray-700 whitespace-pre-line leading-relaxed">
+              {factCheck.explanation}
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* References */}
+        <Card>
+          <CardHeader>
+            <CardTitle>참고 자료</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="papers">
+              <TabsList className="mb-6">
+                <TabsTrigger value="papers">
+                  학술논문 ({papers.length})
+                </TabsTrigger>
+                <TabsTrigger value="books">
+                  도서 ({books.length})
+                </TabsTrigger>
+                <TabsTrigger value="news">
+                  뉴스 ({news.length})
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="papers">
+                <ReferenceList references={papers} />
+              </TabsContent>
+
+              <TabsContent value="books">
+                <ReferenceList references={books} />
+              </TabsContent>
+
+              <TabsContent value="news">
+                <ReferenceList references={news} />
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+
+        {/* Actions */}
+        <div className="flex gap-4">
+          <Link href="/verify" className="flex-1">
+            <Button variant="primary" size="large" className="w-full">
+              새로운 검증하기
+            </Button>
+          </Link>
+          <Button variant="secondary" size="large">
+            결과 공유하기
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReferenceList({ references }: { references: any[] }) {
+  if (references.length === 0) {
+    return (
+      <p className="text-center text-gray-500 py-8">
+        참고 자료가 없습니다
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {references.map((ref) => (
+        <div
+          key={ref.id}
+          className="rounded-lg border border-gray-200 p-4 hover:border-primary-300 transition-colors"
+        >
+          <h4 className="mb-2 font-semibold text-gray-900">{ref.title}</h4>
+          {ref.authors && (
+            <p className="mb-1 text-sm text-gray-600">저자: {ref.authors}</p>
+          )}
+          {ref.publisher && (
+            <p className="mb-1 text-sm text-gray-600">
+              출처: {ref.publisher}
+            </p>
+          )}
+          {ref.snippet && (
+            <p className="mb-2 text-sm text-gray-700">{ref.snippet}</p>
+          )}
+          {ref.url && (
+            <a
+              href={ref.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-primary-600 hover:underline"
+            >
+              자세히 보기 →
+            </a>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}

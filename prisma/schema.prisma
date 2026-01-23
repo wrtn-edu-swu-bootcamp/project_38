@@ -1,0 +1,184 @@
+// Prisma Schema for FactChecker
+// Database: PostgreSQL (Supabase)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// User model for authentication
+model User {
+  id            String      @id @default(cuid())
+  name          String?
+  email         String?     @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?     // hashed password for email/password auth
+  accounts      Account[]
+  sessions      Session[]
+  factChecks    FactCheck[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([email])
+}
+
+// NextAuth Account model
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+// NextAuth Session model
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// Verification Token for email verification
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// FactCheck model - main entity
+model FactCheck {
+  id          String          @id @default(cuid())
+  userId      String?
+  inputType   InputType
+  content     String          @db.Text
+  imageUrl    String?
+  status      FactCheckStatus @default(PENDING)
+  trustScore  Float?
+  verdict     Verdict?
+  summary     String?         @db.Text
+  explanation String?         @db.Text
+  user        User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  references  Reference[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([status])
+  @@index([verdict])
+}
+
+// Reference model - academic papers, books, news
+model Reference {
+  id               String          @id @default(cuid())
+  factCheckId      String
+  type             ReferenceType
+  title            String
+  authors          String?
+  publisher        String?
+  publicationDate  String?
+  url              String?
+  snippet          String?         @db.Text
+  relevanceScore   Float?
+  trustScore       Float?
+  isbn             String?
+  doi              String?
+  imageUrl         String?
+  factCheck        FactCheck       @relation(fields: [factCheckId], references: [id], onDelete: Cascade)
+  libraryBooks     LibraryBook[]
+  createdAt        DateTime        @default(now())
+
+  @@index([factCheckId])
+  @@index([type])
+}
+
+// Library model - physical library locations
+model Library {
+  id          String        @id @default(cuid())
+  name        String
+  address     String
+  phone       String?
+  website     String?
+  latitude    Float
+  longitude   Float
+  region      String?
+  books       LibraryBook[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([latitude, longitude])
+  @@index([region])
+}
+
+// LibraryBook - junction table for Library and Reference (books)
+model LibraryBook {
+  id          String    @id @default(cuid())
+  libraryId   String
+  referenceId String
+  available   Boolean   @default(true)
+  callNumber  String?
+  location    String?
+  library     Library   @relation(fields: [libraryId], references: [id], onDelete: Cascade)
+  reference   Reference @relation(fields: [referenceId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@unique([libraryId, referenceId])
+  @@index([libraryId])
+  @@index([referenceId])
+}
+
+// Enums
+enum InputType {
+  TEXT
+  URL
+  IMAGE
+}
+
+enum FactCheckStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum Verdict {
+  CONFIRMED        // 사실로 확인됨 (80-100점)
+  MOSTLY_TRUE      // 대체로 사실 (60-79점)
+  CAUTION          // 주의 필요 (40-59점)
+  FALSE            // 거짓 (20-39점)
+  UNVERIFIABLE     // 검증 불가 (0-19점)
+}
+
+enum ReferenceType {
+  ACADEMIC_PAPER   // 학술논문
+  BOOK             // 도서
+  NEWS             // 뉴스
+  JOURNAL          // 학술지
+  THESIS           // 학위논문
+  REPORT           // 보고서
+  WEB              // 웹사이트
+}

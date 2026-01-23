@@ -1,0 +1,823 @@
+# FactChecker 프로젝트 AI 코딩 규칙
+
+FactChecker는 가짜뉴스와 허위정보를 학술자료 기반으로 검증하고, 전국 도서관과 연계하여 오프라인 자료 접근성을 제공하는 팩트체크 서비스입니다.
+
+---
+
+## 프로젝트 컨텍스트
+
+### 핵심 기능
+- 다양한 정보 입력 (텍스트, URL, 이미지)
+- AI 기반 팩트체크 분석 (Claude Opus 4.5)
+- 0-100점 신뢰도 점수 및 5단계 판정
+- 학술논문, 도서, 뉴스 등 참고자료 제공
+- 전국 도서관 소장 정보 및 위치 제공
+
+### 핵심 차별점
+- 도서관 연계를 통한 오프라인 자료 접근성
+- 실물 자료 중심의 검증
+- 내용 기반 매칭 (키워드가 아닌 관련성)
+- 정도 표시 (이분법이 아닌 점수+단계)
+
+### 타겟 사용자
+- 일반 대중 (모든 연령대)
+- 1020세대 (유튜브·SNS 정보 검증)
+- 직장인 (건강·육아·생활 정보)
+- 학생·연구자 (과제·논문 자료)
+- 시니어 (메신저 허위정보)
+
+---
+
+## 기술 스택 (2026년 1월 최신)
+
+### 핵심 스택
+- **Next.js**: 16.1.4 (App Router, React Server Components)
+- **React**: 19.0.0 (Actions, useOptimistic, Suspense)
+- **TypeScript**: 5.7 (엄격한 타입 체크)
+- **Tailwind CSS**: 4.1.18 (v4의 5배 빠른 빌드)
+- **tRPC**: v11 (End-to-End 타입 세이프티)
+- **Prisma**: 6.2+ (PostgreSQL ORM)
+- **Zod**: 4.3.5 (런타임 검증)
+- **NextAuth.js**: v5 beta (인증)
+- **TanStack Query**: v5 (서버 상태 관리)
+
+### 외부 서비스
+- **Supabase PostgreSQL**: 데이터베이스
+- **Anthropic Claude Opus 4.5**: AI 팩트체크
+- **Tesseract.js**: OCR
+- **Vercel**: 배포
+
+### API
+- Naver Developers API (학술정보, 책, 뉴스)
+- Kakao Maps API (도서관 위치)
+- 도서관 정보나루 API (국립중앙도서관)
+- 알라딘 API (도서 상세)
+
+---
+
+## 코드 작성 원칙
+
+### 1. End-to-End 타입 안정성 (최우선)
+- TypeScript everywhere
+- tRPC로 클라이언트-서버 타입 동기화
+- Prisma로 데이터베이스 타입 생성
+- Zod로 런타임 검증
+
+✅ Good:
+```typescript
+// tRPC 프로시저
+export const factCheckRouter = createTRPCRouter({
+  create: publicProcedure
+    .input(z.object({
+      content: z.string().min(10).max(5000),
+      inputType: z.enum(["TEXT", "URL", "IMAGE"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      return ctx.db.factCheck.create({ data: input });
+    }),
+});
+```
+
+❌ Bad:
+```typescript
+// any 타입 사용
+export async function createFactCheck(data: any) {
+  return db.factCheck.create({ data });
+}
+```
+
+### 2. React Server Components 우선
+- 기본적으로 모든 컴포넌트는 서버 컴포넌트
+- `"use client"`는 필요한 경우에만 사용
+- Web API(useState, useEffect 등) 필요 시에만 클라이언트 컴포넌트
+
+✅ Good:
+```typescript
+// app/page.tsx - 서버 컴포넌트 (기본)
+export default async function HomePage() {
+  const popularChecks = await getPopularChecks();
+  return <PopularChecks data={popularChecks} />;
+}
+```
+
+❌ Bad:
+```typescript
+// 불필요한 "use client"
+"use client";
+export default function StaticPage() {
+  return <div>정적 콘텐츠</div>;
+}
+```
+
+### 3. 파일 구조 규칙
+
+```
+src/
+├── app/                      # Next.js 16 App Router
+│   ├── (auth)/              # 라우트 그룹: 인증
+│   ├── (main)/              # 라우트 그룹: 메인
+│   ├── api/                 # API Routes
+│   ├── layout.tsx           # 루트 레이아웃
+│   └── providers.tsx        # Context Providers
+├── components/              # React 컴포넌트
+│   ├── ui/                  # 재사용 UI 컴포넌트
+│   ├── layout/              # 레이아웃 컴포넌트
+│   ├── factcheck/           # 팩트체크 도메인
+│   ├── library/             # 도서관 도메인
+│   └── shared/              # 공통 컴포넌트
+├── server/                  # 서버 사이드 로직
+│   ├── api/                 # tRPC 설정 및 라우터
+│   ├── services/            # 비즈니스 로직
+│   └── utils/               # 서버 유틸리티
+├── lib/                     # 유틸리티 및 설정
+├── hooks/                   # Custom React Hooks
+└── types/                   # TypeScript 타입 정의
+```
+
+### 4. 명명 규칙
+
+**컴포넌트**:
+- PascalCase: `FactCheckCard.tsx`
+- 의미 있는 이름: `TrustScoreGauge.tsx` (not `Gauge.tsx`)
+
+**함수**:
+- camelCase: `analyzeFactCheck()`
+- 동사로 시작: `createFactCheck()`, `getFactCheckById()`
+
+**타입/인터페이스**:
+- PascalCase: `FactCheckResult`, `LibraryLocation`
+- Props 타입: `[ComponentName]Props`
+
+**파일**:
+- 컴포넌트: PascalCase (`Button.tsx`)
+- 유틸리티: camelCase (`formatDate.ts`)
+- API 라우터: kebab-case (`fact-check.ts`)
+
+---
+
+## TypeScript 규칙
+
+### 엄격한 타입 사용
+```typescript
+// ✅ Good
+interface FactCheckProps {
+  id: string;
+  content: string;
+  trustScore: number;
+  verdict: Verdict;
+}
+
+// ❌ Bad
+type FactCheckProps = {
+  id: any;
+  content: string;
+}
+```
+
+### any 금지
+- `any` 절대 사용 금지
+- `unknown` 사용 후 타입 가드로 좁히기
+
+```typescript
+// ✅ Good
+function parseJSON(data: unknown): FactCheckResult {
+  if (typeof data === 'object' && data !== null) {
+    return data as FactCheckResult;
+  }
+  throw new Error('Invalid data');
+}
+
+// ❌ Bad
+function parseJSON(data: any): any {
+  return data;
+}
+```
+
+### Enum 대신 const object 사용
+```typescript
+// ✅ Good
+export const Verdict = {
+  CONFIRMED: 'CONFIRMED',
+  MOSTLY_TRUE: 'MOSTLY_TRUE',
+  CAUTION: 'CAUTION',
+  FALSE: 'FALSE',
+  UNKNOWN: 'UNKNOWN',
+} as const;
+export type Verdict = typeof Verdict[keyof typeof Verdict];
+
+// ❌ Bad
+enum Verdict {
+  CONFIRMED,
+  MOSTLY_TRUE,
+}
+```
+
+---
+
+## React/Next.js 패턴
+
+### 1. 서버 컴포넌트 데이터 페칭
+```typescript
+// ✅ Good - 서버 컴포넌트에서 직접 페칭
+export default async function ResultPage({ params }: { params: { id: string } }) {
+  const factCheck = await db.factCheck.findUnique({
+    where: { id: params.id },
+    include: { references: true },
+  });
+  
+  return <ResultCard factCheck={factCheck} />;
+}
+```
+
+### 2. 클라이언트 컴포넌트는 최소화
+```typescript
+// ✅ Good - 필요한 부분만 클라이언트 컴포넌트
+"use client";
+export function InteractiveButton() {
+  const [count, setCount] = useState(0);
+  return <button onClick={() => setCount(count + 1)}>{count}</button>;
+}
+```
+
+### 3. Suspense 활용
+```typescript
+// ✅ Good
+import { Suspense } from 'react';
+
+export default function Page() {
+  return (
+    <Suspense fallback={<LoadingSpinner />}>
+      <AsyncComponent />
+    </Suspense>
+  );
+}
+```
+
+### 4. 에러 핸들링
+```typescript
+// ✅ Good - error.tsx 활용
+// app/result/[id]/error.tsx
+'use client';
+
+export default function Error({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
+  return (
+    <div>
+      <h2>오류가 발생했습니다</h2>
+      <button onClick={reset}>다시 시도</button>
+    </div>
+  );
+}
+```
+
+---
+
+## tRPC 패턴
+
+### 1. 프로시저 정의
+```typescript
+// ✅ Good
+export const factCheckRouter = createTRPCRouter({
+  create: publicProcedure
+    .input(factCheckInputSchema) // Zod 스키마
+    .mutation(async ({ ctx, input }) => {
+      return ctx.db.factCheck.create({
+        data: {
+          ...input,
+          userId: ctx.session?.user?.id,
+          status: Status.PENDING,
+        },
+      });
+    }),
+    
+  getById: publicProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+      return ctx.db.factCheck.findUnique({
+        where: { id: input.id },
+        include: { references: true },
+      });
+    }),
+});
+```
+
+### 2. 클라이언트 사용
+```typescript
+// ✅ Good
+"use client";
+import { api } from "@/lib/trpc";
+
+export function FactCheckForm() {
+  const createFactCheck = api.factCheck.create.useMutation({
+    onSuccess: (data) => {
+      router.push(`/result/${data.id}`);
+    },
+  });
+  
+  const handleSubmit = (input: FactCheckInput) => {
+    createFactCheck.mutate(input);
+  };
+  
+  return <form onSubmit={handleSubmit}>...</form>;
+}
+```
+
+### 3. 인증된 프로시저
+```typescript
+// ✅ Good
+export const userRouter = createTRPCRouter({
+  getHistory: protectedProcedure // 인증 필요
+    .input(z.object({
+      limit: z.number().min(1).max(100).default(10),
+    }))
+    .query(async ({ ctx, input }) => {
+      return ctx.db.factCheck.findMany({
+        where: { userId: ctx.session.user.id },
+        take: input.limit,
+      });
+    }),
+});
+```
+
+---
+
+## Prisma 패턴
+
+### 1. N+1 쿼리 방지
+```typescript
+// ✅ Good - include로 한 번에 페칭
+const factChecks = await db.factCheck.findMany({
+  include: {
+    references: {
+      include: {
+        libraries: {
+          include: { library: true },
+        },
+      },
+    },
+  },
+});
+
+// ❌ Bad - N+1 쿼리
+const factChecks = await db.factCheck.findMany();
+for (const fc of factChecks) {
+  fc.references = await db.reference.findMany({
+    where: { factCheckId: fc.id },
+  });
+}
+```
+
+### 2. 트랜잭션 사용
+```typescript
+// ✅ Good
+await db.$transaction(async (tx) => {
+  const factCheck = await tx.factCheck.create({ data: input });
+  await tx.reference.createMany({
+    data: references.map(ref => ({
+      factCheckId: factCheck.id,
+      ...ref,
+    })),
+  });
+  return factCheck;
+});
+```
+
+### 3. 선택적 필드
+```typescript
+// ✅ Good - 필요한 필드만 선택
+const factChecks = await db.factCheck.findMany({
+  select: {
+    id: true,
+    trustScore: true,
+    verdict: true,
+    createdAt: true,
+  },
+});
+```
+
+---
+
+## Zod 검증 패턴
+
+### 1. 입력 검증
+```typescript
+// ✅ Good
+export const factCheckInputSchema = z.object({
+  inputType: z.enum(["TEXT", "URL", "IMAGE"]),
+  content: z.string()
+    .min(10, "최소 10자 이상 입력해주세요")
+    .max(5000, "최대 5000자까지 입력 가능합니다"),
+  imageUrl: z.string().url().optional(),
+});
+
+export type FactCheckInput = z.infer<typeof factCheckInputSchema>;
+```
+
+### 2. 서버 사이드 검증
+```typescript
+// ✅ Good
+.mutation(async ({ ctx, input }) => {
+  // Zod가 자동으로 검증
+  const validated = factCheckInputSchema.parse(input);
+  return ctx.db.factCheck.create({ data: validated });
+});
+```
+
+---
+
+## 컴포넌트 패턴
+
+### 1. 컴포넌트 구조
+```typescript
+// ✅ Good
+interface ButtonProps {
+  children: React.ReactNode;
+  variant?: 'primary' | 'secondary' | 'text';
+  size?: 'small' | 'default' | 'large';
+  onClick?: () => void;
+  disabled?: boolean;
+}
+
+export function Button({ 
+  children, 
+  variant = 'primary',
+  size = 'default',
+  ...props 
+}: ButtonProps) {
+  const baseClasses = 'font-medium rounded-lg transition-all duration-150';
+  const variants = {
+    primary: 'bg-primary-500 text-white hover:bg-primary-600',
+    secondary: 'bg-white text-primary-600 border border-primary-500',
+    text: 'text-primary-600 hover:underline',
+  };
+  
+  return (
+    <button 
+      className={`${baseClasses} ${variants[variant]}`}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+}
+```
+
+### 2. Custom Hooks
+```typescript
+// ✅ Good
+export function useFactCheck(id: string) {
+  const { data, isLoading, error } = api.factCheck.getById.useQuery(
+    { id },
+    {
+      refetchInterval: (data) => {
+        return data?.status === "PROCESSING" ? 2000 : false;
+      },
+    }
+  );
+  
+  return { factCheck: data, isLoading, error };
+}
+```
+
+---
+
+## Tailwind CSS 스타일링
+
+### 1. 디자인 시스템 준수
+```typescript
+// ✅ Good - Tailwind 클래스 사용
+<div className="bg-white rounded-lg shadow-sm p-6">
+  <h2 className="text-2xl font-semibold text-gray-900 mb-4">제목</h2>
+  <p className="text-gray-600">내용</p>
+</div>
+
+// ❌ Bad - 인라인 스타일
+<div style={{ background: 'white', padding: '24px' }}>
+  <h2 style={{ fontSize: '24px' }}>제목</h2>
+</div>
+```
+
+### 2. 색상 사용
+```typescript
+// Primary: bg-primary-500, text-primary-600
+// Success: bg-success, text-success
+// Warning: bg-warning, text-warning
+// Danger: bg-danger, text-danger
+
+// ✅ Good
+<button className="bg-primary-500 text-white hover:bg-primary-600">
+  버튼
+</button>
+```
+
+### 3. 반응형 디자인
+```typescript
+// ✅ Good - 모바일 우선
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+  {items.map(item => <Card key={item.id} {...item} />)}
+</div>
+```
+
+### 4. 다크 모드 대비 (미래)
+```typescript
+// ✅ Good - 다크 모드 클래스 준비
+<div className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50">
+  콘텐츠
+</div>
+```
+
+---
+
+## 외부 API 연동
+
+### 1. API 클라이언트 패턴
+```typescript
+// ✅ Good
+// src/server/services/datasource/naver.ts
+const headers = {
+  "X-Naver-Client-Id": process.env.NAVER_API_CLIENT_ID!,
+  "X-Naver-Client-Secret": process.env.NAVER_API_CLIENT_SECRET!,
+};
+
+export async function searchNaverBooks(query: string) {
+  try {
+    const url = `https://openapi.naver.com/v1/search/book.json?query=${encodeURIComponent(query)}`;
+    const response = await fetch(url, { headers });
+    
+    if (!response.ok) {
+      throw new Error(`Naver API error: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data.items;
+  } catch (error) {
+    console.error("Naver API 오류:", error);
+    return [];
+  }
+}
+```
+
+### 2. 에러 핸들링
+```typescript
+// ✅ Good
+export async function searchAllSources(query: string) {
+  const [naverBooks, libraryNaru, googleScholar] = await Promise.allSettled([
+    searchNaverBooks(query),
+    searchLibraryNaru(query),
+    searchGoogleScholar(query),
+  ]);
+  
+  return {
+    books: naverBooks.status === 'fulfilled' ? naverBooks.value : [],
+    library: libraryNaru.status === 'fulfilled' ? libraryNaru.value : [],
+    scholar: googleScholar.status === 'fulfilled' ? googleScholar.value : [],
+  };
+}
+```
+
+---
+
+## 보안 규칙
+
+### 1. 환경 변수 관리 (최우선)
+```typescript
+// ✅ Good - 서버에서만 사용
+// src/server/services/ai/claude.ts
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY!, // 서버 전용
+});
+
+// ❌ Bad - 클라이언트에서 API 키 사용 절대 금지
+const apiKey = process.env.ANTHROPIC_API_KEY; // 클라이언트 컴포넌트에서
+```
+
+### 2. 입력 검증 필수
+```typescript
+// ✅ Good - Zod로 모든 입력 검증
+.input(z.object({
+  content: z.string().min(10).max(5000),
+  email: z.string().email(),
+}))
+```
+
+### 3. SQL Injection 방지
+```typescript
+// ✅ Good - Prisma 사용 (자동 방지)
+await db.factCheck.findMany({
+  where: { userId: session.user.id },
+});
+
+// ❌ Bad - Raw SQL 사용 금지
+await db.$queryRaw`SELECT * FROM fact_checks WHERE user_id = ${userId}`;
+```
+
+### 4. XSS 방지
+```typescript
+// ✅ Good - React 자동 이스케이핑
+<div>{userInput}</div>
+
+// ❌ Bad - dangerouslySetInnerHTML 금지
+<div dangerouslySetInnerHTML={{ __html: userInput }} />
+```
+
+### 5. Rate Limiting
+```typescript
+// ✅ Good - tRPC 미들웨어
+const rateLimitMiddleware = t.middleware(({ ctx, next }) => {
+  const identifier = ctx.session?.user?.id || ctx.headers.get('x-forwarded-for');
+  // Rate limit 체크 로직
+  return next();
+});
+```
+
+---
+
+## 성능 최적화
+
+### 1. 이미지 최적화
+```typescript
+// ✅ Good - Next.js Image 컴포넌트
+import Image from 'next/image';
+
+<Image
+  src="/hero-bg.jpg"
+  alt="Hero"
+  width={1920}
+  height={1080}
+  priority // LCP 개선
+  placeholder="blur"
+/>
+```
+
+### 2. 코드 스플리팅
+```typescript
+// ✅ Good - Dynamic Import
+import dynamic from 'next/dynamic';
+
+const LibraryMap = dynamic(
+  () => import('@/components/library/LibraryMap'),
+  {
+    loading: () => <LoadingSpinner />,
+    ssr: false, // 클라이언트 전용
+  }
+);
+```
+
+### 3. 캐싱 전략
+```typescript
+// ✅ Good - TanStack Query 캐싱
+const { data } = api.factCheck.getPopular.useQuery(
+  { limit: 10 },
+  {
+    staleTime: 5 * 60 * 1000, // 5분
+    cacheTime: 10 * 60 * 1000, // 10분
+  }
+);
+```
+
+### 4. 데이터베이스 최적화
+```typescript
+// ✅ Good - 인덱스 활용
+model FactCheck {
+  // ...
+  @@index([userId])
+  @@index([createdAt])
+  @@index([status])
+}
+```
+
+---
+
+## 금지 사항
+
+### 절대 하지 말 것
+❌ `any` 타입 사용
+❌ API 키를 코드에 하드코딩
+❌ 클라이언트 컴포넌트에서 API 키 사용
+❌ `.env` 파일을 Git에 커밋
+❌ `dangerouslySetInnerHTML` 사용
+❌ Raw SQL 쿼리 (Prisma 대신)
+❌ N+1 쿼리
+❌ 인라인 스타일 (Tailwind 대신)
+❌ `console.log` 프로덕션 배포
+❌ 에러 무시 (try-catch 없이)
+
+### Deprecated
+❌ Pages Router (App Router 사용)
+❌ `getServerSideProps` (서버 컴포넌트 사용)
+❌ `getStaticProps` (서버 컴포넌트 사용)
+❌ CSS Modules (Tailwind 사용)
+❌ Redux (TanStack Query + tRPC 사용)
+❌ Axios (fetch 사용)
+
+---
+
+## 커밋 메시지 규칙
+
+```
+feat: 새로운 기능 추가
+fix: 버그 수정
+docs: 문서 업데이트
+style: 코드 포맷팅 (기능 변경 없음)
+refactor: 리팩토링
+test: 테스트 추가
+chore: 빌드, 설정 변경
+
+예시:
+feat: 팩트체크 입력 폼 구현
+fix: 신뢰도 점수 계산 오류 수정
+docs: API 문서 업데이트
+```
+
+---
+
+## 디버깅 및 로깅
+
+### 1. 개발 환경 로깅
+```typescript
+// ✅ Good
+if (process.env.NODE_ENV === 'development') {
+  console.log('Debug info:', data);
+}
+```
+
+### 2. 프로덕션 에러 로깅
+```typescript
+// ✅ Good
+try {
+  // 로직
+} catch (error) {
+  console.error('Fact check analysis failed:', error);
+  // Sentry 등으로 전송
+  throw error; // 재전송
+}
+```
+
+---
+
+## 테스트 (추후 구현)
+
+### 1. 단위 테스트
+```typescript
+// 추후 Vitest 사용 예정
+describe('calculateTrustScore', () => {
+  it('should return 80-100 for confirmed facts', () => {
+    const score = calculateTrustScore(mockReferences);
+    expect(score).toBeGreaterThanOrEqual(80);
+  });
+});
+```
+
+---
+
+## 접근성 (a11y)
+
+### 1. Semantic HTML
+```typescript
+// ✅ Good
+<header>...</header>
+<nav>...</nav>
+<main>...</main>
+<article>...</article>
+<footer>...</footer>
+```
+
+### 2. ARIA 레이블
+```typescript
+// ✅ Good
+<button aria-label="검색">
+  <SearchIcon />
+</button>
+```
+
+### 3. 키보드 접근성
+```typescript
+// ✅ Good - focus 스타일 명시
+<button className="focus:outline-none focus:ring-2 focus:ring-primary-500">
+  버튼
+</button>
+```
+
+---
+
+## 참고 문서
+
+프로젝트의 상세 문서는 `docs/` 폴더 참조:
+- `code-architecture.md` - 전체 아키텍처
+- `TECH-STACK.md` - 기술 스택 상세
+- `design-guide.md` - 디자인 시스템
+- `CONTRIBUTING.md` - 기여 가이드
+- `GETTING-STARTED.md` - 개발 시작
+- `ENV-SETUP.md` - 환경 변수 설정
+- `DEPLOYMENT.md` - Vercel 배포
+
+---
+
+**문서 버전**: 1.0
+**작성일**: 2026년 1월 23일
+**프로젝트 버전**: 0.2.0 (아키텍처 설계 완료)
