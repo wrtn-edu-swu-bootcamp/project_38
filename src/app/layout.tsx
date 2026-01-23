@@ -1,8 +1,16 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import { Providers } from "./providers";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import "./globals.css";
+
+// Font optimization with next/font
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-inter",
+});
 
 export const metadata: Metadata = {
   title: "FactChecker - 학술자료 기반 팩트체크 서비스",
@@ -31,7 +39,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ko" suppressHydrationWarning>
+    <html lang="ko" suppressHydrationWarning className={inter.variable}>
       <body className="font-sans antialiased">
         <Providers>
           <div className="flex min-h-screen flex-col">

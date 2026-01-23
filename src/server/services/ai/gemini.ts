@@ -1,11 +1,9 @@
-// Claude AI client for fact-checking analysis
+// Gemini AI client for fact-checking analysis
 
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// Initialize Anthropic client
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY!,
-});
+// Initialize Gemini client
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
 export interface FactCheckAnalysisRequest {
   content: string;
@@ -28,42 +26,35 @@ export interface FactCheckAnalysisResponse {
 }
 
 /**
- * Analyze content using Claude AI
+ * Analyze content using Gemini AI
  */
-export async function analyzeWithClaude(
+export async function analyzeWithGemini(
   request: FactCheckAnalysisRequest
 ): Promise<FactCheckAnalysisResponse> {
   try {
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     const prompt = createFactCheckPrompt(request);
 
-    const message = await anthropic.messages.create({
-      model: "claude-opus-4-20250514",
-      max_tokens: 4096,
-      temperature: 0.3, // Lower temperature for more consistent analysis
-      messages: [
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: {
+        temperature: 0.3, // Lower temperature for more consistent analysis
+        maxOutputTokens: 4096,
+      },
     });
 
-    // Extract text from response
-    const responseText =
-      message.content[0].type === "text" ? message.content[0].text : "";
-
-    // Parse JSON response
-    const analysis = parseClaudeResponse(responseText);
+    const responseText = result.response.text();
+    const analysis = parseGeminiResponse(responseText);
 
     return analysis;
   } catch (error) {
-    console.error("Claude AI error:", error);
+    console.error("Gemini AI error:", error);
     throw new Error("AI 분석 중 오류가 발생했습니다.");
   }
 }
 
 /**
- * Create fact-check prompt for Claude
+ * Create fact-check prompt for Gemini
  */
 function createFactCheckPrompt(request: FactCheckAnalysisRequest): string {
   const { content, references } = request;
@@ -88,17 +79,17 @@ ${content}
 """
 
 참고 자료:
-${referencesText}
+${referencesText || "참고 자료 없음"}
 
-다음 형식으로 JSON 응답을 제공해주세요:
+다음 형식으로 JSON 응답을 제공해주세요. 반드시 유효한 JSON 형식이어야 합니다:
 
 {
-  "trustScore": 0-100 사이의 신뢰도 점수,
-  "verdict": "CONFIRMED" | "MOSTLY_TRUE" | "CAUTION" | "FALSE" | "UNVERIFIABLE" 중 하나,
+  "trustScore": 0-100 사이의 신뢰도 점수 (숫자만),
+  "verdict": "CONFIRMED" 또는 "MOSTLY_TRUE" 또는 "CAUTION" 또는 "FALSE" 또는 "UNVERIFIABLE" 중 하나,
   "summary": "2-3문장의 간단한 결론 요약",
   "explanation": "상세한 분석 내용 (왜 이런 판정을 내렸는지, 어떤 근거가 있는지)",
   "keyPoints": ["핵심 포인트 1", "핵심 포인트 2", "핵심 포인트 3"],
-  "relevantReferences": [관련성이 높은 참고자료의 인덱스 배열]
+  "relevantReferences": [관련성이 높은 참고자료의 인덱스 배열, 예: [0, 2, 5]]
 }
 
 평가 기준:
@@ -108,17 +99,27 @@ ${referencesText}
 - FALSE (20-39점): 명백한 허위 정보
 - UNVERIFIABLE (0-19점): 검증할 수 있는 자료가 부족함
 
-응답은 반드시 유효한 JSON 형식이어야 합니다.`;
+중요: 응답은 위의 JSON 형식만 출력하세요. 다른 텍스트를 포함하지 마세요.`;
 }
 
 /**
- * Parse Claude's response to extract JSON
+ * Parse Gemini's response to extract JSON
  */
-function parseClaudeResponse(responseText: string): FactCheckAnalysisResponse {
+function parseGeminiResponse(responseText: string): FactCheckAnalysisResponse {
   try {
-    // Try to extract JSON from code blocks
-    const jsonMatch = responseText.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
-    const jsonText = jsonMatch ? jsonMatch[1] : responseText;
+    // Try to extract JSON from code blocks first
+    let jsonText = responseText;
+    
+    const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (jsonMatch) {
+      jsonText = jsonMatch[1];
+    } else {
+      // Try to find raw JSON object
+      const objectMatch = responseText.match(/\{[\s\S]*\}/);
+      if (objectMatch) {
+        jsonText = objectMatch[0];
+      }
+    }
 
     const parsed = JSON.parse(jsonText);
 
@@ -132,18 +133,24 @@ function parseClaudeResponse(responseText: string): FactCheckAnalysisResponse {
       throw new Error("Invalid response format");
     }
 
+    // Validate verdict value
+    const validVerdicts = ["CONFIRMED", "MOSTLY_TRUE", "CAUTION", "FALSE", "UNVERIFIABLE"];
+    if (!validVerdicts.includes(parsed.verdict)) {
+      parsed.verdict = "UNVERIFIABLE";
+    }
+
     return {
-      trustScore: Math.max(0, Math.min(100, parsed.trustScore)),
+      trustScore: Math.max(0, Math.min(100, Math.round(parsed.trustScore))),
       verdict: parsed.verdict,
       summary: parsed.summary,
       explanation: parsed.explanation,
       keyPoints: Array.isArray(parsed.keyPoints) ? parsed.keyPoints : [],
       relevantReferences: Array.isArray(parsed.relevantReferences)
-        ? parsed.relevantReferences
+        ? parsed.relevantReferences.filter((n: unknown) => typeof n === "number")
         : [],
     };
   } catch (error) {
-    console.error("Failed to parse Claude response:", error);
+    console.error("Failed to parse Gemini response:", error);
     console.error("Response text:", responseText);
 
     // Return default error response
@@ -151,7 +158,7 @@ function parseClaudeResponse(responseText: string): FactCheckAnalysisResponse {
       trustScore: 0,
       verdict: "UNVERIFIABLE",
       summary: "AI 응답 파싱에 실패했습니다.",
-      explanation: "분석 결과를 처리하는 중 오류가 발생했습니다.",
+      explanation: "분석 결과를 처리하는 중 오류가 발생했습니다. 다시 시도해주세요.",
       keyPoints: [],
       relevantReferences: [],
     };

@@ -2,7 +2,7 @@
 
 import { db } from "@/lib/prisma";
 import { searchAllSources } from "@/server/services/datasource";
-import { analyzeWithClaude } from "@/server/services/ai/claude";
+import { analyzeWithGemini } from "@/server/services/ai/gemini";
 import type { ReferenceData } from "@/types";
 
 /**
@@ -30,8 +30,8 @@ export async function analyzeFactCheck(
       ...searchResults.news,
     ];
 
-    // 3. Analyze with Claude AI
-    const analysis = await analyzeWithClaude({
+    // 3. Analyze with Gemini AI
+    const analysis = await analyzeWithGemini({
       content,
       references: allReferences.map((ref) => ({
         type: ref.type,

@@ -43,7 +43,7 @@ FactChecker는 가짜뉴스와 허위정보를 학술자료 기반으로 검증�
 
 ### 외부 서비스
 - **Supabase PostgreSQL**: 데이터베이스
-- **Anthropic Claude Opus 4.5**: AI 팩트체크
+- **Google Gemini 1.5 Flash**: AI 팩트체크
 - **Tesseract.js**: OCR
 - **Vercel**: 배포
 

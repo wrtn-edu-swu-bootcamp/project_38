@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { api } from "@/lib/trpc";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -10,13 +11,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/Tabs";
 
 export default function VerifyPage() {
   const router = useRouter();
+  const { data: session } = useSession();
   const [activeTab, setActiveTab] = useState<"text" | "url" | "image">("text");
   const [textInput, setTextInput] = useState("");
   const [urlInput, setUrlInput] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [error, setError] = useState("");
 
-  const createFactCheck = api.factCheck.create.useMutation({
+  // Use different mutations based on login status
+  const createFactCheckAuth = api.factCheck.create.useMutation({
     onSuccess: (data) => {
       router.push(`/result/${data.id}`);
     },
@@ -24,6 +27,18 @@ export default function VerifyPage() {
       setError(error.message);
     },
   });
+
+  const createFactCheckPublic = api.factCheck.createPublic.useMutation({
+    onSuccess: (data) => {
+      router.push(`/result/${data.id}`);
+    },
+    onError: (error) => {
+      setError(error.message);
+    },
+  });
+
+  const createFactCheck = session ? createFactCheckAuth : createFactCheckPublic;
+  const isLoading = createFactCheckAuth.isPending || createFactCheckPublic.isPending;
 
   const handleTextSubmit = () => {
     if (textInput.length < 10) {
@@ -125,8 +140,8 @@ export default function VerifyPage() {
                   variant="primary"
                   size="large"
                   onClick={handleTextSubmit}
-                  loading={createFactCheck.isPending}
-                  disabled={createFactCheck.isPending}
+                  loading={isLoading}
+                  disabled={isLoading}
                   className="w-full"
                 >
                   검증 시작하기
@@ -152,8 +167,8 @@ export default function VerifyPage() {
                   variant="primary"
                   size="large"
                   onClick={handleUrlSubmit}
-                  loading={createFactCheck.isPending}
-                  disabled={createFactCheck.isPending}
+                  loading={isLoading}
+                  disabled={isLoading}
                   className="w-full"
                 >
                   검증 시작하기
@@ -218,8 +233,8 @@ export default function VerifyPage() {
                   variant="primary"
                   size="large"
                   onClick={handleImageSubmit}
-                  loading={createFactCheck.isPending}
-                  disabled={createFactCheck.isPending || !imageFile}
+                  loading={isLoading}
+                  disabled={isLoading || !imageFile}
                   className="w-full"
                 >
                   검증 시작하기

@@ -1,33 +1,60 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { db } from "@/lib/prisma";
 
-export default function HomePage() {
+async function getRecentFactChecks() {
+  try {
+    const factChecks = await db.factCheck.findMany({
+      where: { status: "COMPLETED" },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+      select: {
+        id: true,
+        content: true,
+        trustScore: true,
+        verdict: true,
+        summary: true,
+        createdAt: true,
+      },
+    });
+    return factChecks;
+  } catch {
+    return [];
+  }
+}
+
+export default async function HomePage() {
+  const recentFactChecks = await getRecentFactChecks();
+
   return (
     <main>
       {/* Hero Section */}
-      <section className="bg-gradient-to-b from-primary-50 to-white py-20">
+      <section className="bg-gradient-to-b from-primary-50 to-white py-24">
         <div className="container mx-auto px-4">
           <div className="mx-auto max-w-4xl text-center">
-            <h1 className="mb-6 text-5xl font-bold text-gray-900 md:text-6xl">
+            {/* 메인 타이틀 */}
+            <h1 className="mb-6 text-6xl font-extrabold text-primary-600 md:text-7xl tracking-tight">
+              FactChecker
+            </h1>
+            
+            {/* 소제목 */}
+            <h2 className="mb-8 text-3xl font-bold text-gray-900 md:text-4xl leading-relaxed">
               AI와 학술자료로
               <br />
-              <span className="text-primary-600">정확한 정보 검증</span>
-            </h1>
-            <p className="mb-8 text-xl text-gray-600">
+              <span className="text-primary-500">정확한 정보 검증</span>
+            </h2>
+            
+            <p className="mb-10 text-xl text-gray-600 leading-relaxed">
               가짜뉴스와 허위정보를 학술자료 기반으로 검증하고,
               <br />
               전국 도서관 연계로 오프라인 자료까지 확인하세요
             </p>
-            <div className="flex flex-col gap-4 sm:flex-row sm:justify-center">
+            <div className="flex justify-center">
               <Link href="/verify">
                 <Button variant="primary" size="large">
                   지금 검증하기
-                </Button>
-              </Link>
-              <Link href="/about">
-                <Button variant="secondary" size="large">
-                  서비스 소개
                 </Button>
               </Link>
             </div>
@@ -90,7 +117,7 @@ export default function HomePage() {
               </CardHeader>
               <CardContent>
                 <p className="text-gray-600">
-                  Claude AI가 학술논문, 도서, 뉴스 등을 종합 분석하여
+                  Gemini AI가 학술논문, 도서, 뉴스 등을 종합 분석하여
                   신뢰도를 평가합니다.
                 </p>
               </CardContent>
@@ -174,7 +201,7 @@ export default function HomePage() {
                   AI 분석
                 </h3>
                 <p className="text-gray-600">
-                  Claude AI가 수집된 자료를 종합 분석하여 신뢰도 점수와 판정을 제공합니다.
+                  Gemini AI가 수집된 자료를 종합 분석하여 신뢰도 점수와 판정을 제공합니다.
                 </p>
               </div>
             </div>
@@ -194,6 +221,68 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Recent Fact Checks */}
+      {recentFactChecks.length > 0 && (
+        <section className="py-20">
+          <div className="container mx-auto px-4">
+            <h2 className="mb-8 text-center text-3xl font-bold text-gray-900">
+              최근 검증된 정보
+            </h2>
+            <div className="mx-auto max-w-3xl space-y-4">
+              {recentFactChecks.map((item) => {
+                const verdictConfig: Record<
+                  string,
+                  { label: string; variant: "success" | "info" | "warning" | "danger" | "neutral" }
+                > = {
+                  CONFIRMED: { label: "사실", variant: "success" },
+                  MOSTLY_TRUE: { label: "대체로 사실", variant: "info" },
+                  CAUTION: { label: "주의", variant: "warning" },
+                  FALSE: { label: "거짓", variant: "danger" },
+                  UNVERIFIABLE: { label: "검증 불가", variant: "neutral" },
+                };
+                const verdict = item.verdict
+                  ? verdictConfig[item.verdict] || verdictConfig.UNVERIFIABLE
+                  : null;
+
+                return (
+                  <Link key={item.id} href={`/result/${item.id}`}>
+                    <Card className="hover:border-primary-200 transition-colors cursor-pointer">
+                      <CardContent className="py-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-gray-900 line-clamp-1 mb-1">
+                              {item.content}
+                            </p>
+                            <p className="text-sm text-gray-500 line-clamp-1">
+                              {item.summary}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {verdict && (
+                              <Badge variant={verdict.variant}>{verdict.label}</Badge>
+                            )}
+                            {item.trustScore !== null && (
+                              <span className="text-sm font-medium text-gray-600">
+                                {item.trustScore.toFixed(0)}점
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                );
+              })}
+            </div>
+            <div className="mt-8 text-center">
+              <Link href="/verify">
+                <Button variant="secondary">더 많은 검증하기</Button>
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* CTA Section */}
       <section className="py-20">

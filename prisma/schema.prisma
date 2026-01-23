@@ -22,6 +22,7 @@ model User {
   accounts      Account[]
   sessions      Session[]
   factChecks    FactCheck[]
+  bookmarks     Bookmark[]
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
@@ -83,6 +84,7 @@ model FactCheck {
   explanation String?         @db.Text
   user        User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
   references  Reference[]
+  bookmarks   Bookmark[]
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
@@ -149,6 +151,20 @@ model LibraryBook {
   @@unique([libraryId, referenceId])
   @@index([libraryId])
   @@index([referenceId])
+}
+
+// Bookmark model - user saved fact checks
+model Bookmark {
+  id           String    @id @default(cuid())
+  userId       String
+  factCheckId  String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  factCheck    FactCheck @relation(fields: [factCheckId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now())
+
+  @@unique([userId, factCheckId])
+  @@index([userId])
+  @@index([factCheckId])
 }
 
 // Enums

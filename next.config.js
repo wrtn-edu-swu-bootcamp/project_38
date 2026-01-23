@@ -1,4 +1,11 @@
+// @ts-check
+const { withSentryConfig } = require("@sentry/nextjs");
+
 /** @type {import('next').NextConfig} */
+const withBundleAnalyzer = require('@next/bundle-analyzer')({
+  enabled: process.env.ANALYZE === 'true',
+});
+
 const nextConfig = {
   // 이미지 최적화
   images: {
@@ -65,6 +72,29 @@ const nextConfig = {
       },
     ];
   },
+
+  // Turbopack 설정 (Next.js 16)
+  turbopack: {},
 };
 
-module.exports = nextConfig;
+// Sentry configuration
+const sentryWebpackPluginOptions = {
+  org: process.env.SENTRY_ORG || "factchecker",
+  project: process.env.SENTRY_PROJECT || "factchecker-nextjs",
+  silent: !process.env.CI,
+  widenClientFileUpload: true,
+  reactComponentAnnotation: {
+    enabled: true,
+  },
+  tunnelRoute: "/monitoring",
+  hideSourceMaps: true,
+  disableLogger: true,
+  automaticVercelMonitors: true,
+};
+
+// Only wrap with Sentry if DSN is provided
+const configWithPlugins = process.env.NEXT_PUBLIC_SENTRY_DSN
+  ? withSentryConfig(withBundleAnalyzer(nextConfig), sentryWebpackPluginOptions)
+  : withBundleAnalyzer(nextConfig);
+
+module.exports = configWithPlugins;

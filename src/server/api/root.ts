@@ -4,6 +4,8 @@
 import { createTRPCRouter } from "@/server/api/trpc";
 import { factCheckRouter } from "./routers/factcheck";
 import { libraryRouter } from "./routers/library";
+import { userRouter } from "./routers/user";
+import { bookmarkRouter } from "./routers/bookmark";
 
 /**
  * This is the primary router for your server.
@@ -13,6 +15,8 @@ import { libraryRouter } from "./routers/library";
 export const appRouter = createTRPCRouter({
   factCheck: factCheckRouter,
   library: libraryRouter,
+  user: userRouter,
+  bookmark: bookmarkRouter,
 });
 
 // Export type definition of API

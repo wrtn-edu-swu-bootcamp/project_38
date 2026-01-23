@@ -9,7 +9,7 @@ export interface CardProps extends HTMLAttributes<HTMLDivElement> {
 export const Card = forwardRef<HTMLDivElement, CardProps>(
   ({ className = "", hover = true, children, ...props }, ref) => {
     const baseClasses =
-      "rounded-lg border border-gray-200 bg-white p-6 shadow-sm";
+      "rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800";
     const hoverClasses = hover ? "transition-shadow hover:shadow-md" : "";
 
     return (
@@ -46,7 +46,7 @@ export const CardTitle = forwardRef<
   return (
     <h3
       ref={ref}
-      className={`text-xl font-semibold text-gray-900 ${className}`}
+      className={`text-xl font-semibold text-gray-900 dark:text-gray-100 ${className}`}
       {...props}
     >
       {children}
